@@ -1,4 +1,4 @@
-import sql from "@/app/api/utils/sql";
+import sql from "../utils/sql.js";
 
 // Validation helpers
 const validateLimit = (limit) => {

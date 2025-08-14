@@ -1,4 +1,4 @@
-import sql from "@/app/api/utils/sql";
+import sql from "../utils/sql.js";
 
 // Get bot settings
 export async function GET(request) {

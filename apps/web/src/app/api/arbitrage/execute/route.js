@@ -1,5 +1,5 @@
-import { withStrictRateLimit } from "@/app/api/utils/rateLimiter";
-import sql from "@/app/api/utils/sql";
+import { withStrictRateLimit } from "../../utils/rateLimiter.js";
+import sql from "../../utils/sql.js";
 
 // Execute arbitrage trade sequence: USDT → XRP → BTC → USDT
 async function postHandler(request) {
