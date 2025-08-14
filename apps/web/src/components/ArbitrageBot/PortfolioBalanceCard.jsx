@@ -6,8 +6,8 @@ export function PortfolioBalanceCard({
 }) {
   const totalValue =
     balances.USDT +
-    balances.AEVO * currentPrices["AEVO/USDT"] +
-    balances.BTC * currentPrices["BTC/USDT"];
+    (balances.XRP || 0) * (currentPrices["XRP/USDT"] || 0) +
+    balances.BTC * (currentPrices["BTC/USDT"] || 0);
 
   return (
     <div className="bg-gray-800 p-6 rounded-lg">

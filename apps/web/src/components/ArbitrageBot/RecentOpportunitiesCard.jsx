@@ -42,15 +42,15 @@ export function RecentOpportunitiesCard({ opportunities }) {
                 </span>
               </div>
               <div className="text-sm text-gray-300">
-                AEVO/USDT: {opp.aevoUsdtDeviation > 0 ? "+" : ""}
-                {opp.aevoUsdtDeviation.toFixed(2)}% | AEVO/BTC:{" "}
-                {opp.aevoBtcDeviation > 0 ? "+" : ""}
-                {opp.aevoBtcDeviation.toFixed(2)}%
+                XRP/USDT: {opp.xrpUsdtDeviation > 0 ? "+" : ""}
+                {opp.xrpUsdtDeviation.toFixed(2)}% | BTC/USDT:{" "}
+                {opp.btcUsdtDeviation > 0 ? "+" : ""}
+                {opp.btcUsdtDeviation.toFixed(2)}%
               </div>
               {opp.potentialProfit && (
                 <div className="text-xs text-gray-400 mt-1">
-                  Potential: ${opp.potentialProfit.toFixed(2)} | AEVO: $
-                  {opp.aevoPrice ? opp.aevoPrice.toFixed(4) : "N/A"} | BTC: $
+                  Potential: ${opp.potentialProfit.toFixed(2)} | XRP: $
+                  {opp.xrpPrice ? opp.xrpPrice.toFixed(4) : "N/A"} | BTC: $
                   {opp.btcPrice ? opp.btcPrice.toFixed(0) : "N/A"}
                 </div>
               )}

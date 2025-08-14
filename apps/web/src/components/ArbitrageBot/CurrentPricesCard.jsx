@@ -15,6 +15,14 @@ export function CurrentPricesCard({
     return `${Math.floor(diff / 3600)}h ago`;
   };
 
+  const xrpIsLow = movingAverages["XRP/USDT"]
+    ? currentPrices["XRP/USDT"] <= movingAverages["XRP/USDT"] * 0.97
+    : false;
+  const btcIsHigh = movingAverages["BTC/USDT"]
+    ? currentPrices["BTC/USDT"] >= movingAverages["BTC/USDT"] * 1.03
+    : false;
+  const arbitrageReady = xrpIsLow && btcIsHigh;
+
   return (
     <div className="bg-gray-800 p-6 rounded-lg">
       <div className="flex items-center justify-between mb-4">
@@ -32,55 +40,37 @@ export function CurrentPricesCard({
         </div>
       </div>
       <div className="space-y-3">
-        {["AEVO/USDT", "BTC/USDT", "AEVO/BTC"].map((pair) => {
-          const price = currentPrices[pair];
-          const ma = movingAverages[pair];
+        {["XRP/USDT", "BTC/USDT", "XRP/BTC"].map((pair) => {
+          const price = currentPrices[pair] || 0;
+          const ma = movingAverages[pair] || 0;
           const deviation = ma ? ((price - ma) / ma) * 100 : 0;
 
-          const aevoUsdtDeviation = movingAverages["AEVO/USDT"]
-            ? ((currentPrices["AEVO/USDT"] - movingAverages["AEVO/USDT"]) /
-                movingAverages["AEVO/USDT"]) *
-              100
-            : 0;
-          const aevoBtcDeviation = movingAverages["AEVO/BTC"]
-            ? ((currentPrices["AEVO/BTC"] - movingAverages["AEVO/BTC"]) /
-                movingAverages["AEVO/BTC"]) *
-              100
-            : 0;
-
           let conditionMet = false;
-          if (
-            pair === "AEVO/BTC" &&
-            aevoBtcDeviation >= 4.0 &&
-            aevoBtcDeviation > aevoUsdtDeviation
-          )
-            conditionMet = true;
+          if (pair === "XRP/USDT" && xrpIsLow) conditionMet = true;
+          if (pair === "BTC/USDT" && btcIsHigh) conditionMet = true;
 
           return (
             <div
               key={pair}
-              className={`flex justify-between items-center ${conditionMet ? "bg-green-900/30 p-2 rounded" : ""}`}
+              className={`flex justify-between items-center ${conditionMet && arbitrageReady ? "bg-green-900/30 p-2 rounded" : ""}`}
             >
               <span className="font-medium">
                 {pair}
-                {conditionMet && (
+                {conditionMet && arbitrageReady && (
                   <span className="ml-2 text-green-400 text-xs">
-                    ✓ ARBITRAGE READY
+                    ✓ TRIGGER
                   </span>
                 )}
               </span>
               <div className="text-right">
                 <div className="font-mono">
-                  $
-                  {price.toFixed(
-                    pair.includes("BTC") && !pair.includes("AEVO") ? 0 : 6,
-                  )}
+                  {pair.includes("BTC") && !pair.includes("XRP") ? (price.toFixed(2)) : (price.toFixed(6))}
                 </div>
-                {ma && (
+                {ma > 0 && (
                   <div
-                    className={`text-sm ${deviation > 0 ? "text-green-400" : "text-red-400"}`}
+                    className={`text-sm ${deviation >= 0 ? "text-green-400" : "text-red-400"}`}
                   >
-                    {deviation > 0 ? "+" : ""}
+                    {deviation >= 0 ? "+" : ""}
                     {deviation.toFixed(2)}% vs MA
                   </div>
                 )}
@@ -90,9 +80,9 @@ export function CurrentPricesCard({
         })}
       </div>
       <div className="mt-4 pt-4 border-t border-gray-700 text-sm text-gray-400">
-        <div>Strategy: Execute when AEVO/BTC ≥4% {">"} AEVO/USDT increase</div>
-        <div>• AEVO/BTC: ≥4.0% increase vs MA</div>
-        <div>• AEVO/BTC increase must exceed AEVO/USDT increase</div>
+        <div>Strategy: Execute when XRP is low and BTC is high.</div>
+        <div>• XRP/USDT: ≤3.0% below 12h MA</div>
+        <div>• BTC/USDT: ≥3.0% above 12h MA</div>
       </div>
     </div>
   );

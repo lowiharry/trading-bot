@@ -220,7 +220,6 @@ async function getCurrentDynamicPrice(symbol) {
     if (response.ok) {
       const data = await response.json();
       if (data.success && data.data) {
-        // Convert symbol format: AEVOUSDT -> AEVO/USDT
         const formattedSymbol = symbol
           .replace(/USDT$/, "/USDT")
           .replace(/BTC$/, "/BTC");
@@ -246,9 +245,9 @@ async function getCurrentDynamicPrice(symbol) {
   const randomVariation = (Math.random() - 0.5) * 0.03; // ±1.5% random
 
   const basePrices = {
-    AEVOUSDT: 0.85,
-    BTCUSDT: 43500,
-    AEVOBTC: 0.0000195,
+    XRPUSDT: 0.5,
+    BTCUSDT: 60000,
+    XRPBTC: 0.0000083,
   };
 
   const basePrice = basePrices[symbol];
