@@ -52,20 +52,12 @@ export function useArbitrageBot() {
   const [isSavingSettings, setIsSavingSettings] = useState(false);
 
   const intervalRef = useRef();
-  const priceIntervalRef = useRef();
-  const maIntervalRef = useRef();
-  const tradesIntervalRef = useRef();
-  const opportunitiesIntervalRef = useRef();
   const saveTimeoutRef = useRef();
 
   const currentPricesStable = useMemo(() => currentPrices, [currentPrices]);
   const movingAveragesStable = useMemo(() => movingAverages, [movingAverages]);
   const settingsStable = useMemo(() => settings, [settings]);
 
-  const hasTradeError = useMemo(
-    () => error && error.includes("Failed to fetch trades"),
-    [error],
-  );
 
   const loadSettings = useCallback(async () => {
     try {
@@ -169,7 +161,7 @@ export function useArbitrageBot() {
         setStats(data.data.stats);
         setDataFreshness((prev) => ({ ...prev, trades: new Date() }));
 
-        if (hasTradeError) {
+        if (error && error.includes("Failed to fetch trades")) {
           setError(null);
         }
       } else {
@@ -181,7 +173,7 @@ export function useArbitrageBot() {
     } finally {
       setIsLoadingTrades(false);
     }
-  }, [isDemoMode, hasTradeError]);
+  }, [isDemoMode, error]);
 
   const fetchOpportunities = useCallback(async () => {
     setIsLoadingOpportunities(true);
@@ -284,31 +276,24 @@ export function useArbitrageBot() {
   ]);
 
   useEffect(() => {
-    [
-      priceIntervalRef,
-      maIntervalRef,
-      tradesIntervalRef,
-      opportunitiesIntervalRef,
-    ].forEach((ref) => {
-      if (ref.current) clearInterval(ref.current);
-    });
+    const id = setInterval(fetchPrices, 2000);
+    return () => clearInterval(id);
+  }, [fetchPrices]);
 
-    priceIntervalRef.current = setInterval(fetchPrices, 2000);
-    maIntervalRef.current = setInterval(fetchMovingAverages, 60000);
-    tradesIntervalRef.current = setInterval(fetchTrades, 3000);
-    opportunitiesIntervalRef.current = setInterval(fetchOpportunities, 2000);
+  useEffect(() => {
+    const id = setInterval(fetchMovingAverages, 60000);
+    return () => clearInterval(id);
+  }, [fetchMovingAverages]);
 
-    return () => {
-      [
-        priceIntervalRef,
-        maIntervalRef,
-        tradesIntervalRef,
-        opportunitiesIntervalRef,
-      ].forEach((ref) => {
-        if (ref.current) clearInterval(ref.current);
-      });
-    };
-  }, [fetchPrices, fetchMovingAverages, fetchTrades, fetchOpportunities]);
+  useEffect(() => {
+    const id = setInterval(fetchTrades, 3000);
+    return () => clearInterval(id);
+  }, [fetchTrades]);
+
+  useEffect(() => {
+    const id = setInterval(fetchOpportunities, 2000);
+    return () => clearInterval(id);
+  }, [fetchOpportunities]);
 
   const calculateOpportunity = useCallback(() => {
     const xrpUsdtPrice = currentPricesStable["XRP/USDT"];
@@ -318,15 +303,6 @@ export function useArbitrageBot() {
     const btcUsdtMA = movingAveragesStable["BTC/USDT"];
     const xrpBtcMA = movingAveragesStable["XRP/BTC"];
 
-    console.log("🔍 Calculating opportunity with prices:", {
-      xrpUsdtPrice,
-      btcUsdtPrice,
-      xrpBtcPrice,
-      xrpUsdtMA,
-      btcUsdtMA,
-      xrpBtcMA,
-    });
-
     if (
       !xrpUsdtPrice ||
       !btcUsdtPrice ||
@@ -335,7 +311,6 @@ export function useArbitrageBot() {
       !btcUsdtMA ||
       !xrpBtcMA
     ) {
-      console.log("❌ Missing price data for opportunity calculation");
       return null;
     }
 
@@ -350,103 +325,49 @@ export function useArbitrageBot() {
     const profitPercentage =
       (potentialProfit / settingsStable.tradeAmount) * 100;
 
-    console.log("📊 Deviations and profit:", {
-      xrpUsdtDeviation: xrpUsdtDeviation.toFixed(4),
-      xrpBtcDeviation: xrpBtcDeviation.toFixed(4),
-      btcUsdtDeviation: btcUsdtDeviation.toFixed(4),
-      profitPercentage: profitPercentage.toFixed(4),
-      profitTarget: settingsStable.profitTarget,
-    });
-
-    const isXrpBtcRising = xrpBtcDeviation >= 0.1;
-    const hasSignificantMovement = Math.abs(xrpBtcDeviation) >= 0.05;
-    const isArbitrageViable = Math.abs(profitPercentage) >= 0.01;
-    const hasMinimumDeviation =
-      Math.abs(xrpUsdtDeviation) > 0.01 || Math.abs(xrpBtcDeviation) > 0.01;
-
-    const hasSmallButViableProfit = profitPercentage >= 0.01;
-    const hasReasonableVolatility =
-      Math.abs(xrpUsdtDeviation) > 0.005 || Math.abs(btcUsdtDeviation) > 0.005;
-
     const crossRate = xrpUsdtPrice / btcUsdtPrice;
     const actualRate = xrpBtcPrice;
     const rateDiscrepancy =
       Math.abs((crossRate - actualRate) / actualRate) * 100;
-    const hasRateDiscrepancy = rateDiscrepancy >= 0.01;
 
-    const shouldConsiderOpportunity =
-      hasMinimumDeviation ||
-      hasRateDiscrepancy ||
-      hasReasonableVolatility ||
-      Math.abs(profitPercentage) > 0.005;
+    const hasVolatility =
+      Math.abs(xrpUsdtDeviation) > 0.005 ||
+      Math.abs(btcUsdtDeviation) > 0.005 ||
+      Math.abs(xrpBtcDeviation) >= 0.05;
+    const hasDiscrepancy = rateDiscrepancy >= 0.01;
+    const meetsProfitTarget = profitPercentage > settingsStable.profitTarget;
 
-    console.log("🎯 Trading conditions:", {
-      isXrpBtcRising,
-      hasSignificantMovement,
-      isArbitrageViable,
-      hasMinimumDeviation,
-      hasSmallButViableProfit,
-      hasReasonableVolatility,
-      hasRateDiscrepancy,
-      shouldConsiderOpportunity,
-      meetsEntryThreshold: profitPercentage > settingsStable.profitTarget,
-    });
+    const isInteresting =
+      hasVolatility || hasDiscrepancy || profitPercentage > 0.005;
 
-    if (shouldConsiderOpportunity) {
-      const isValid =
-        profitPercentage > 0.01 &&
-        (isXrpBtcRising ||
-          hasSignificantMovement ||
-          hasRateDiscrepancy ||
-          hasSmallButViableProfit ||
-          hasReasonableVolatility ||
-          Math.abs(profitPercentage) > settingsStable.profitTarget);
-
-      console.log(`${isValid ? "✅ VALID" : "❌ INVALID"} opportunity found:`, {
-        profitPercentage: profitPercentage.toFixed(4),
-        potentialProfit: potentialProfit.toFixed(4),
-        isValid,
-      });
-
-      return {
-        isValid,
-        xrpUsdtDeviation,
-        xrpBtcDeviation,
-        btcUsdtDeviation,
-        potentialProfit,
-        profitPercentage,
-        timestamp: new Date(),
-        xrpUsdtMA,
-        btcUsdtMA,
-        xrpBtcMA,
-        xrpPrice: xrpUsdtPrice,
-        btcPrice: btcUsdtPrice,
-        crossRate,
-        actualRate,
-        rateDiscrepancy,
-        conditions: {
-          isXrpBtcRising,
-          hasSignificantMovement,
-          hasRateDiscrepancy,
-          isArbitrageViable,
-          hasSmallButViableProfit,
-          hasReasonableVolatility,
-          meetsEntryThreshold: profitPercentage > settingsStable.profitTarget,
-          reasonsValid: [
-            isXrpBtcRising && "XRP/BTC rising (0.1%+)",
-            hasSignificantMovement && "Movement detected (0.05%+)",
-            hasRateDiscrepancy && "Rate discrepancy (0.01%+)",
-            hasSmallButViableProfit && "Viable profit (0.01%+)",
-            profitPercentage > settingsStable.profitTarget &&
-              "Exceeds profit target",
-            hasReasonableVolatility && "Market volatility detected",
-          ].filter(Boolean),
-        },
-      };
+    if (!isInteresting) {
+      return null;
     }
 
-    console.log("🚫 No opportunity found - insufficient market conditions");
-    return null;
+    const isValid = meetsProfitTarget && (hasVolatility || hasDiscrepancy);
+
+    return {
+      isValid,
+      xrpUsdtDeviation,
+      xrpBtcDeviation,
+      btcUsdtDeviation,
+      potentialProfit,
+      profitPercentage,
+      timestamp: new Date(),
+      xrpUsdtMA,
+      btcUsdtMA,
+      xrpBtcMA,
+      xrpPrice: xrpUsdtPrice,
+      btcPrice: btcUsdtPrice,
+      crossRate,
+      actualRate,
+      rateDiscrepancy,
+      conditions: {
+        hasVolatility,
+        hasDiscrepancy,
+        meetsProfitTarget,
+      },
+    };
   }, [currentPricesStable, movingAveragesStable, settingsStable]);
 
   const executeArbitrageTrade = useCallback(
@@ -756,6 +677,14 @@ export function useArbitrageBot() {
     [settingsStable, saveSettings],
   );
 
+  useEffect(() => {
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, []);
+
   const currentOpportunity = useMemo(
     () => calculateOpportunity(),
     [calculateOpportunity],
@@ -767,7 +696,7 @@ export function useArbitrageBot() {
 
   const setIsDemoModeWithSync = useCallback(
     async (newDemoMode) => {
-      console.log(`🔄 Switching to ${newDemoM ? "DEMO" : "LIVE"} mode...`);
+      console.log(`🔄 Switching to ${newDemoMode ? "DEMO" : "LIVE"} mode...`);
 
       if (!newDemoMode) {
         console.log(
@@ -795,7 +724,7 @@ export function useArbitrageBot() {
           `✅ Successfully switched to ${newDemoMode ? "DEMO" : "LIVE"} mode`,
         );
 
-        await Promise.all([fetchTrades(), fetchBalances()]);
+        await Promise.all([fetchBalances()]);
       } catch (err) {
         console.error("Error saving demo mode:", err);
         setError("Failed to save demo mode: " + err.message);
