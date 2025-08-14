@@ -22,35 +22,34 @@ export function BotSettings({
           Triangular Arbitrage Strategy
         </h4>
         <p className="text-sm text-gray-300">
-          Bot executes USDT → AEVO → BTC → USDT when AEVO/BTC ≥4% increase
-          exceeds AEVO/USDT increase. Trades execute sequentially with
-          10-second intervals.
+          Bot executes USDT → XRP → BTC → USDT when certain price conditions are met.
+          Trades execute sequentially with 10-second intervals.
         </p>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <div>
           <label className="block text-sm font-medium mb-2">
-            AEVO/USDT Threshold (%)
+            XRP/USDT Threshold (%)
           </label>
           <input
             type="number"
-            value={2.5}
+            value={3.0}
             disabled
             className="w-full bg-gray-600 border border-gray-500 rounded px-3 py-2 opacity-75"
           />
-          <div className="text-xs text-gray-400 mt-1">Fixed at 2.5%</div>
+          <div className="text-xs text-gray-400 mt-1">Fixed at 3.0% below MA</div>
         </div>
         <div>
           <label className="block text-sm font-medium mb-2">
-            AEVO/BTC Threshold (%)
+            BTC/USDT Threshold (%)
           </label>
           <input
             type="number"
-            value={4.0}
+            value={3.0}
             disabled
             className="w-full bg-gray-600 border border-gray-500 rounded px-3 py-2 opacity-75"
           />
-          <div className="text-xs text-gray-400 mt-1">Fixed at 4.0%</div>
+          <div className="text-xs text-gray-400 mt-1">Fixed at 3.0% above MA</div>
         </div>
         <div>
           <label className="block text-sm font-medium mb-2">

@@ -5,29 +5,29 @@ export function useArbitrageBot() {
   const [isDemoMode, setIsDemoMode] = useState(true);
   const [balances, setBalances] = useState({
     USDT: 10000,
-    AEVO: 0,
+    XRP: 0,
     BTC: 0,
   });
   const [currentPrices, setCurrentPrices] = useState({
-    "AEVO/USDT": 0.85,
-    "BTC/USDT": 43500,
-    "AEVO/BTC": 0.0000195,
+    "XRP/USDT": 0.5,
+    "BTC/USDT": 60000,
+    "XRP/BTC": 0.0000083,
   });
   const [movingAverages, setMovingAverages] = useState({
-    "AEVO/USDT": 0.82,
-    "BTC/USDT": 42200,
-    "AEVO/BTC": 0.0000195,
+    "XRP/USDT": 0.51,
+    "BTC/USDT": 59000,
+    "XRP/BTC": 0.0000085,
   });
   const [opportunities, setOpportunities] = useState([]);
   const [trades, setTrades] = useState([]);
   const [totalProfit, setTotalProfit] = useState(0);
   const [stats, setStats] = useState(null);
   const [settings, setSettings] = useState({
-    entryThreshold: 0.01, // Much more aggressive - ultra-frequent entries
-    profitTarget: 0.005, // Much smaller profits - micro-profits
-    stopLoss: 0.1, // Tighter stop loss - better risk management
+    entryThreshold: 0.01,
+    profitTarget: 0.005,
+    stopLoss: 0.1,
     tradeAmount: 1000,
-    maxConcurrentTrades: 5, // More activity - maximum concurrent trades
+    maxConcurrentTrades: 5,
     apiKey: "",
     secretKey: "",
     passphrase: "",
@@ -58,12 +58,10 @@ export function useArbitrageBot() {
   const opportunitiesIntervalRef = useRef();
   const saveTimeoutRef = useRef();
 
-  // Memoize stable references to prevent unnecessary re-renders
   const currentPricesStable = useMemo(() => currentPrices, [currentPrices]);
   const movingAveragesStable = useMemo(() => movingAverages, [movingAverages]);
   const settingsStable = useMemo(() => settings, [settings]);
 
-  // Memoize error check to prevent unnecessary dependencies
   const hasTradeError = useMemo(
     () => error && error.includes("Failed to fetch trades"),
     [error],
@@ -76,11 +74,11 @@ export function useArbitrageBot() {
         const data = await response.json();
         if (data.success && data.data) {
           setSettings({
-            entryThreshold: data.data.entryThreshold || 0.01, // Much more aggressive - ultra-frequent entries
-            profitTarget: data.data.profitTarget || 0.005, // Much smaller profits - micro-profits
-            stopLoss: data.data.stopLoss || 0.1, // Tighter stop loss - better risk management
+            entryThreshold: data.data.entryThreshold || 0.01,
+            profitTarget: data.data.profitTarget || 0.005,
+            stopLoss: data.data.stopLoss || 0.1,
             tradeAmount: data.data.tradeAmount || 1000,
-            maxConcurrentTrades: data.data.maxConcurrentTrades || 5, // More activity - maximum concurrent trades
+            maxConcurrentTrades: data.data.maxConcurrentTrades || 5,
             apiKey: data.data.api_key_encrypted ? "••••••••••••••••" : "",
             secretKey: "",
             passphrase: "",
@@ -127,24 +125,24 @@ export function useArbitrageBot() {
   const fetchMovingAverages = useCallback(async () => {
     setIsLoadingMA(true);
     try {
-      const [aevoResponse, btcResponse, aevoBtcResponse] = await Promise.all([
-        fetch("/api/bitget/candles?symbol=AEVOUSDT"),
+      const [xrpResponse, btcResponse, xrpBtcResponse] = await Promise.all([
+        fetch("/api/bitget/candles?symbol=XRPUSDT"),
         fetch("/api/bitget/candles?symbol=BTCUSDT"),
-        fetch("/api/bitget/candles?symbol=AEVOBTC"),
+        fetch("/api/bitget/candles?symbol=XRPBTC"),
       ]);
 
-      if (aevoResponse.ok && btcResponse.ok && aevoBtcResponse.ok) {
-        const [aevoData, btcData, aevoBtcData] = await Promise.all([
-          aevoResponse.json(),
+      if (xrpResponse.ok && btcResponse.ok && xrpBtcResponse.ok) {
+        const [xrpData, btcData, xrpBtcData] = await Promise.all([
+          xrpResponse.json(),
           btcResponse.json(),
-          aevoBtcResponse.json(),
+          xrpBtcResponse.json(),
         ]);
 
-        if (aevoData.success && btcData.success && aevoBtcData.success) {
+        if (xrpData.success && btcData.success && xrpBtcData.success) {
           setMovingAverages({
-            "AEVO/USDT": aevoData.data.movingAverage,
+            "XRP/USDT": xrpData.data.movingAverage,
             "BTC/USDT": btcData.data.movingAverage,
-            "AEVO/BTC": aevoBtcData.data.movingAverage,
+            "XRP/BTC": xrpBtcData.data.movingAverage,
           });
           setDataFreshness((prev) => ({ ...prev, movingAverages: new Date() }));
         }
@@ -220,7 +218,6 @@ export function useArbitrageBot() {
           data.data.balances,
         );
       } else {
-        // If live balance fails, fall back to demo
         if (data.fallback) {
           setBalances(data.fallback.balances);
           console.log(
@@ -232,7 +229,6 @@ export function useArbitrageBot() {
       }
     } catch (err) {
       console.error("Error fetching balances:", err);
-      // Keep existing balances on error to avoid UI flicker
     } finally {
       setIsLoadingBalances(false);
     }
@@ -245,12 +241,12 @@ export function useArbitrageBot() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            aevo_price: currentPricesStable["AEVO/USDT"],
+            xrp_price: currentPricesStable["XRP/USDT"],
             btc_price: currentPricesStable["BTC/USDT"],
-            aevo_ma: opportunity.aevoUsdtMA,
-            btc_ma: opportunity.aevoBtcMA,
-            aevo_deviation: opportunity.aevoUsdtDeviation,
-            btc_deviation: opportunity.aevoBtcDeviation,
+            xrp_ma: opportunity.xrpUsdtMA,
+            btc_ma: opportunity.xrpBtcMA,
+            xrp_deviation: opportunity.xrpUsdtDeviation,
+            btc_deviation: opportunity.xrpBtcDeviation,
             potential_profit: opportunity.potentialProfit,
             profit_percentage: opportunity.profitPercentage,
             was_executed: opportunity.was_executed || false,
@@ -266,7 +262,6 @@ export function useArbitrageBot() {
     [currentPricesStable, fetchOpportunities],
   );
 
-  // Initial data load effect - only runs once
   useEffect(() => {
     const initializeData = async () => {
       await Promise.all([
@@ -288,9 +283,7 @@ export function useArbitrageBot() {
     fetchBalances,
   ]);
 
-  // Optimized interval management
   useEffect(() => {
-    // Clear all existing intervals
     [
       priceIntervalRef,
       maIntervalRef,
@@ -300,11 +293,10 @@ export function useArbitrageBot() {
       if (ref.current) clearInterval(ref.current);
     });
 
-    // Set up REAL-TIME refresh intervals
-    priceIntervalRef.current = setInterval(fetchPrices, 2000); // Every 2 seconds
-    maIntervalRef.current = setInterval(fetchMovingAverages, 60000); // Every 1 minute
-    tradesIntervalRef.current = setInterval(fetchTrades, 3000); // Every 3 seconds - REAL-TIME
-    opportunitiesIntervalRef.current = setInterval(fetchOpportunities, 2000); // Every 2 seconds - REAL-TIME
+    priceIntervalRef.current = setInterval(fetchPrices, 2000);
+    maIntervalRef.current = setInterval(fetchMovingAverages, 60000);
+    tradesIntervalRef.current = setInterval(fetchTrades, 3000);
+    opportunitiesIntervalRef.current = setInterval(fetchOpportunities, 2000);
 
     return () => {
       [
@@ -319,73 +311,69 @@ export function useArbitrageBot() {
   }, [fetchPrices, fetchMovingAverages, fetchTrades, fetchOpportunities]);
 
   const calculateOpportunity = useCallback(() => {
-    const aevoUsdtPrice = currentPricesStable["AEVO/USDT"];
+    const xrpUsdtPrice = currentPricesStable["XRP/USDT"];
     const btcUsdtPrice = currentPricesStable["BTC/USDT"];
-    const aevoBtcPrice = currentPricesStable["AEVO/BTC"];
-    const aevoUsdtMA = movingAveragesStable["AEVO/USDT"];
+    const xrpBtcPrice = currentPricesStable["XRP/BTC"];
+    const xrpUsdtMA = movingAveragesStable["XRP/USDT"];
     const btcUsdtMA = movingAveragesStable["BTC/USDT"];
-    const aevoBtcMA = movingAveragesStable["AEVO/BTC"];
+    const xrpBtcMA = movingAveragesStable["XRP/BTC"];
 
     console.log("🔍 Calculating opportunity with prices:", {
-      aevoUsdtPrice,
+      xrpUsdtPrice,
       btcUsdtPrice,
-      aevoBtcPrice,
-      aevoUsdtMA,
+      xrpBtcPrice,
+      xrpUsdtMA,
       btcUsdtMA,
-      aevoBtcMA,
+      xrpBtcMA,
     });
 
     if (
-      !aevoUsdtPrice ||
+      !xrpUsdtPrice ||
       !btcUsdtPrice ||
-      !aevoBtcPrice ||
-      !aevoUsdtMA ||
+      !xrpBtcPrice ||
+      !xrpUsdtMA ||
       !btcUsdtMA ||
-      !aevoBtcMA
+      !xrpBtcMA
     ) {
       console.log("❌ Missing price data for opportunity calculation");
       return null;
     }
 
-    const aevoUsdtDeviation = ((aevoUsdtPrice - aevoUsdtMA) / aevoUsdtMA) * 100;
-    const aevoBtcDeviation = ((aevoBtcPrice - aevoBtcMA) / aevoBtcMA) * 100;
+    const xrpUsdtDeviation = ((xrpUsdtPrice - xrpUsdtMA) / xrpUsdtMA) * 100;
+    const xrpBtcDeviation = ((xrpBtcPrice - xrpBtcMA) / xrpBtcMA) * 100;
     const btcUsdtDeviation = ((btcUsdtPrice - btcUsdtMA) / btcUsdtMA) * 100;
 
-    const aevoAmount = settingsStable.tradeAmount / aevoUsdtPrice;
-    const btcAmount = aevoAmount * aevoBtcPrice;
+    const xrpAmount = settingsStable.tradeAmount / xrpUsdtPrice;
+    const btcAmount = xrpAmount * xrpBtcPrice;
     const finalUsdt = btcAmount * btcUsdtPrice;
     const potentialProfit = finalUsdt - settingsStable.tradeAmount;
     const profitPercentage =
       (potentialProfit / settingsStable.tradeAmount) * 100;
 
     console.log("📊 Deviations and profit:", {
-      aevoUsdtDeviation: aevoUsdtDeviation.toFixed(4),
-      aevoBtcDeviation: aevoBtcDeviation.toFixed(4),
+      xrpUsdtDeviation: xrpUsdtDeviation.toFixed(4),
+      xrpBtcDeviation: xrpBtcDeviation.toFixed(4),
       btcUsdtDeviation: btcUsdtDeviation.toFixed(4),
       profitPercentage: profitPercentage.toFixed(4),
       profitTarget: settingsStable.profitTarget,
     });
 
-    // MUCH MORE PERMISSIVE CONDITIONS for frequent execution
-    const isAevoBtcRising = aevoBtcDeviation >= 0.1; // Reduced from 1.0% to 0.1%
-    const hasSignificantMovement = Math.abs(aevoBtcDeviation) >= 0.05; // Reduced from 0.7% to 0.05%
-    const isArbitrageViable = Math.abs(profitPercentage) >= 0.01; // Reduced from 0.1% to 0.01%
+    const isXrpBtcRising = xrpBtcDeviation >= 0.1;
+    const hasSignificantMovement = Math.abs(xrpBtcDeviation) >= 0.05;
+    const isArbitrageViable = Math.abs(profitPercentage) >= 0.01;
     const hasMinimumDeviation =
-      Math.abs(aevoUsdtDeviation) > 0.01 || Math.abs(aevoBtcDeviation) > 0.01; // Reduced from 0.2% to 0.01%
+      Math.abs(xrpUsdtDeviation) > 0.01 || Math.abs(xrpBtcDeviation) > 0.01;
 
-    // Even more permissive conditions for tiny profits
-    const hasSmallButViableProfit = profitPercentage >= 0.01; // Reduced from 0.15% to 0.01%
+    const hasSmallButViableProfit = profitPercentage >= 0.01;
     const hasReasonableVolatility =
-      Math.abs(aevoUsdtDeviation) > 0.005 || Math.abs(btcUsdtDeviation) > 0.005; // Reduced from 0.1% to 0.005%
+      Math.abs(xrpUsdtDeviation) > 0.005 || Math.abs(btcUsdtDeviation) > 0.005;
 
-    // Calculate price efficiency - detect when prices are out of sync
-    const crossRate = aevoUsdtPrice / btcUsdtPrice; // AEVO/USDT ÷ BTC/USDT should ≈ AEVO/BTC
-    const actualRate = aevoBtcPrice;
+    const crossRate = xrpUsdtPrice / btcUsdtPrice;
+    const actualRate = xrpBtcPrice;
     const rateDiscrepancy =
       Math.abs((crossRate - actualRate) / actualRate) * 100;
-    const hasRateDiscrepancy = rateDiscrepancy >= 0.01; // Reduced from 0.3% to 0.01%
+    const hasRateDiscrepancy = rateDiscrepancy >= 0.01;
 
-    // Even more permissive main condition check
     const shouldConsiderOpportunity =
       hasMinimumDeviation ||
       hasRateDiscrepancy ||
@@ -393,7 +381,7 @@ export function useArbitrageBot() {
       Math.abs(profitPercentage) > 0.005;
 
     console.log("🎯 Trading conditions:", {
-      isAevoBtcRising,
+      isXrpBtcRising,
       hasSignificantMovement,
       isArbitrageViable,
       hasMinimumDeviation,
@@ -405,15 +393,14 @@ export function useArbitrageBot() {
     });
 
     if (shouldConsiderOpportunity) {
-      // VERY PERMISSIVE validity check - trade on ANY reasonable profit
       const isValid =
-        profitPercentage > 0.01 && // ANY positive profit > 0.01%
-        (isAevoBtcRising ||
+        profitPercentage > 0.01 &&
+        (isXrpBtcRising ||
           hasSignificantMovement ||
           hasRateDiscrepancy ||
           hasSmallButViableProfit ||
           hasReasonableVolatility ||
-          Math.abs(profitPercentage) > settingsStable.profitTarget); // Multiple paths to validity
+          Math.abs(profitPercentage) > settingsStable.profitTarget);
 
       console.log(`${isValid ? "✅ VALID" : "❌ INVALID"} opportunity found:`, {
         profitPercentage: profitPercentage.toFixed(4),
@@ -423,22 +410,22 @@ export function useArbitrageBot() {
 
       return {
         isValid,
-        aevoUsdtDeviation,
-        aevoBtcDeviation,
+        xrpUsdtDeviation,
+        xrpBtcDeviation,
         btcUsdtDeviation,
         potentialProfit,
         profitPercentage,
         timestamp: new Date(),
-        aevoUsdtMA,
+        xrpUsdtMA,
         btcUsdtMA,
-        aevoBtcMA,
-        aevoPrice: aevoUsdtPrice,
+        xrpBtcMA,
+        xrpPrice: xrpUsdtPrice,
         btcPrice: btcUsdtPrice,
         crossRate,
         actualRate,
         rateDiscrepancy,
         conditions: {
-          isAevoBtcRising,
+          isXrpBtcRising,
           hasSignificantMovement,
           hasRateDiscrepancy,
           isArbitrageViable,
@@ -446,7 +433,7 @@ export function useArbitrageBot() {
           hasReasonableVolatility,
           meetsEntryThreshold: profitPercentage > settingsStable.profitTarget,
           reasonsValid: [
-            isAevoBtcRising && "AEVO/BTC rising (0.1%+)",
+            isXrpBtcRising && "XRP/BTC rising (0.1%+)",
             hasSignificantMovement && "Movement detected (0.05%+)",
             hasRateDiscrepancy && "Rate discrepancy (0.01%+)",
             hasSmallButViableProfit && "Viable profit (0.01%+)",
@@ -476,7 +463,7 @@ export function useArbitrageBot() {
         console.error("Trade execution timeout");
         setError("Trade execution timed out");
         setIsExecuting(false);
-      }, 120000); // 2 minute timeout
+      }, 120000);
 
       try {
         console.log("🚀 Starting trade execution with opportunity:", {
@@ -492,11 +479,11 @@ export function useArbitrageBot() {
           trade_amount: settingsStable.tradeAmount,
           current_prices: currentPricesStable,
           settings: {
-            aevoUsdtMA: opportunity.aevoUsdtMA,
-            aevoBtcMA: opportunity.aevoBtcMA,
+            xrpUsdtMA: opportunity.xrpUsdtMA,
+            xrpBtcMA: opportunity.xrpBtcMA,
             btcUsdtMA: opportunity.btcUsdtMA,
-            aevoUsdtDeviation: opportunity.aevoUsdtDeviation,
-            aevoBtcDeviation: opportunity.aevoBtcDeviation,
+            xrpUsdtDeviation: opportunity.xrpUsdtDeviation,
+            xrpBtcDeviation: opportunity.xrpBtcDeviation,
             btcUsdtDeviation: opportunity.btcUsdtDeviation,
           },
           is_demo: isDemoMode,
@@ -542,19 +529,16 @@ export function useArbitrageBot() {
             executionTime: data.data.executionTime,
           });
 
-          // Update demo balance immediately for better UX
           if (isDemoMode && data.data.profit) {
             const profit = parseFloat(data.data.profit);
             setBalances((prev) => ({
               ...prev,
-              USDT: Math.max(0, prev.USDT + profit), // Prevent negative balances
+              USDT: Math.max(0, prev.USDT + profit),
             }));
           }
 
-          // Refresh data after successful trade
           await Promise.all([fetchTrades(), fetchOpportunities()]);
 
-          // Clear any previous errors
           setError(null);
         } else {
           console.error("❌ Trade failed on server:", {
@@ -577,7 +561,6 @@ export function useArbitrageBot() {
           timestamp: new Date().toISOString(),
         });
 
-        // Categorize errors for better user feedback
         let userFriendlyMessage = "Trade execution failed";
 
         if (err.message.includes("timeout")) {
@@ -600,7 +583,6 @@ export function useArbitrageBot() {
 
         setError(userFriendlyMessage + " (Check console for details)");
 
-        // Refresh trades to ensure we have latest status
         try {
           await fetchTrades();
         } catch (refreshError) {
@@ -621,7 +603,6 @@ export function useArbitrageBot() {
     ],
   );
 
-  // Bot execution logic
   useEffect(() => {
     if (isRunning && !isExecuting) {
       console.log(
@@ -647,7 +628,6 @@ export function useArbitrageBot() {
             recordOpportunity({ ...opportunity, was_executed: true });
             executeArbitrageTrade(opportunity);
           } else if (Math.abs(opportunity.profitPercentage) > 0.001) {
-            // Record ANY opportunity with >0.001% profit for visibility
             console.log(
               "📋 Recording opportunity (not executed):",
               opportunity.profitPercentage.toFixed(6) + "% - Reasons invalid:",
@@ -669,14 +649,14 @@ export function useArbitrageBot() {
               movingAverages:
                 Object.keys(movingAveragesStable).length > 0 ? "✓" : "❌",
               pricesData: {
-                "AEVO/USDT": currentPricesStable["AEVO/USDT"] || "missing",
+                "XRP/USDT": currentPricesStable["XRP/USDT"] || "missing",
                 "BTC/USDT": currentPricesStable["BTC/USDT"] || "missing",
-                "AEVO/BTC": currentPricesStable["AEVO/BTC"] || "missing",
+                "XRP/BTC": currentPricesStable["XRP/BTC"] || "missing",
               },
             },
           );
         }
-      }, 5000); // Reduced from 15000ms to 5000ms (5 seconds)
+      }, 5000);
     } else {
       if (intervalRef.current) {
         console.log(
@@ -787,9 +767,8 @@ export function useArbitrageBot() {
 
   const setIsDemoModeWithSync = useCallback(
     async (newDemoMode) => {
-      console.log(`🔄 Switching to ${newDemoMode ? "DEMO" : "LIVE"} mode...`);
+      console.log(`🔄 Switching to ${newDemoM ? "DEMO" : "LIVE"} mode...`);
 
-      // Warning about live mode requirements
       if (!newDemoMode) {
         console.log(
           "⚠️ Switching to LIVE mode - API credentials may be required for actual trading",
@@ -804,7 +783,7 @@ export function useArbitrageBot() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             isDemoMode: newDemoMode,
-            isActive: isRunning, // Keep bot running if it was running
+            isActive: isRunning,
           }),
         });
         if (!response.ok) throw new Error("Failed to save demo mode");
@@ -816,7 +795,6 @@ export function useArbitrageBot() {
           `✅ Successfully switched to ${newDemoMode ? "DEMO" : "LIVE"} mode`,
         );
 
-        // Refresh trades and balances to show the correct data for the new mode
         await Promise.all([fetchTrades(), fetchBalances()]);
       } catch (err) {
         console.error("Error saving demo mode:", err);

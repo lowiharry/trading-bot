@@ -30,8 +30,7 @@ export function DashboardHeader({
           </h1>
           <div className="text-gray-400 mt-2">
             <p className="mb-2">
-              USDT → AEVO → BTC → USDT when AEVO/BTC ≥4% increase {">"}{" "}
-              AEVO/USDT increase
+              USDT → XRP → BTC → USDT when XRP is low and BTC is high.
             </p>
 
             {/* Data Freshness Indicators */}

@@ -1,8 +1,10 @@
+import { withDataRateLimit } from "@/app/api/utils/rateLimiter";
+
 // Bitget API integration for candlestick data and moving averages
-export async function GET(request) {
+async function handler(request) {
   try {
     const { searchParams } = new URL(request.url);
-    const symbol = searchParams.get("symbol") || "AEVOUSDT";
+    const symbol = searchParams.get("symbol") || "XRPUSDT";
     const granularity = searchParams.get("granularity") || "12H"; // 12-hour candles
     const limit = searchParams.get("limit") || "100";
 
@@ -60,7 +62,7 @@ export async function GET(request) {
 
     // Get symbol from request params for mock data
     const { searchParams } = new URL(request.url);
-    const symbol = searchParams.get("symbol") || "AEVOUSDT";
+    const symbol = searchParams.get("symbol") || "XRPUSDT";
 
     // Return mock data if API fails
     const mockCandles = generateMockCandles(symbol);
@@ -106,9 +108,9 @@ function generateMockCandles(symbol) {
   const interval = 12 * 60 * 60 * 1000; // 12 hours in milliseconds
 
   let basePrice;
-  if (symbol === "AEVOUSDT") basePrice = 0.85;
-  else if (symbol === "BTCUSDT") basePrice = 43500;
-  else if (symbol === "AEVOBTC") basePrice = 0.0000195;
+  if (symbol === "XRPUSDT") basePrice = 0.5;
+  else if (symbol === "BTCUSDT") basePrice = 60000;
+  else if (symbol === "XRPBTC") basePrice = 0.0000083;
   else basePrice = 1;
 
   for (let i = 99; i >= 0; i--) {
@@ -135,3 +137,5 @@ function generateMockCandles(symbol) {
 
   return candles;
 }
+
+export const GET = withDataRateLimit(handler);

@@ -12,7 +12,7 @@ export async function GET(request) {
         data: {
           balances: {
             USDT: 10000,
-            AEVO: 0,
+            XRP: 0,
             BTC: 0,
           },
           mode: "demo",
@@ -108,7 +108,7 @@ export async function GET(request) {
       const assets = data.data || [];
       const balances = {
         USDT: 0,
-        AEVO: 0,
+        XRP: 0,
         BTC: 0,
       };
 
@@ -119,8 +119,8 @@ export async function GET(request) {
         
         if (symbol === "USDT") {
           balances.USDT = available;
-        } else if (symbol === "AEVO") {
-          balances.AEVO = available;
+        } else if (symbol === "XRP") {
+          balances.XRP = available;
         } else if (symbol === "BTC") {
           balances.BTC = available;
         }
@@ -147,7 +147,7 @@ export async function GET(request) {
           fallback: {
             balances: {
               USDT: 10000,
-              AEVO: 0,
+              XRP: 0,
               BTC: 0,
             },
             mode: "demo_fallback",

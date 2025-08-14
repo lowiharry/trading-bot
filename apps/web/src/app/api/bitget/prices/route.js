@@ -1,8 +1,10 @@
+import { withDataRateLimit } from "@/app/api/utils/rateLimiter";
+
 // Bitget API integration for real-time price data
-export async function GET(request) {
+async function handler(request) {
   try {
     const { searchParams } = new URL(request.url);
-    const symbols = searchParams.get("symbols") || "AEVOUSDT,BTCUSDT,AEVOBTC";
+    const symbols = searchParams.get("symbols") || "XRPUSDT,BTCUSDT,XRPBTC";
 
     // Bitget API endpoint for ticker prices
     const bitgetUrl = `https://api.bitget.com/api/spot/v1/market/tickers?symbol=${symbols}`;
@@ -29,9 +31,9 @@ export async function GET(request) {
       let pairName = ticker.symbol;
 
       // Convert Bitget symbol format to our format
-      if (pairName === "AEVOUSDT") pairName = "AEVO/USDT";
+      if (pairName === "XRPUSDT") pairName = "XRP/USDT";
       else if (pairName === "BTCUSDT") pairName = "BTC/USDT";
-      else if (pairName === "AEVOBTC") pairName = "AEVO/BTC";
+      else if (pairName === "XRPBTC") pairName = "XRP/BTC";
 
       prices[pairName] = {
         price: parseFloat(ticker.close),
@@ -53,28 +55,28 @@ export async function GET(request) {
 
     // Return mock data if API fails (for demo purposes)
     const mockPrices = {
-      "AEVO/USDT": {
-        price: 0.85 + (Math.random() - 0.5) * 0.02,
-        volume: 1250000,
-        change24h: -2.5,
-        high24h: 0.89,
-        low24h: 0.82,
+      "XRP/USDT": {
+        price: 0.5 + (Math.random() - 0.5) * 0.01,
+        volume: 50000000,
+        change24h: -1.5,
+        high24h: 0.52,
+        low24h: 0.48,
         timestamp: Date.now(),
       },
       "BTC/USDT": {
-        price: 43500 + (Math.random() - 0.5) * 500,
+        price: 60000 + (Math.random() - 0.5) * 500,
         volume: 850000000,
         change24h: 1.8,
-        high24h: 44200,
-        low24h: 42800,
+        high24h: 61000,
+        low24h: 59000,
         timestamp: Date.now(),
       },
-      "AEVO/BTC": {
-        price: 0.0000195 + (Math.random() - 0.5) * 0.000001,
-        volume: 45000,
-        change24h: -4.2,
-        high24h: 0.0000205,
-        low24h: 0.0000188,
+      "XRP/BTC": {
+        price: 0.0000083 + (Math.random() - 0.5) * 0.0000001,
+        volume: 1000000,
+        change24h: -2.0,
+        high24h: 0.0000085,
+        low24h: 0.0000081,
         timestamp: Date.now(),
       },
     };
@@ -87,3 +89,5 @@ export async function GET(request) {
     });
   }
 }
+
+export const GET = withDataRateLimit(handler);

@@ -1,7 +1,8 @@
+import { withStrictRateLimit } from "@/app/api/utils/rateLimiter";
 import sql from "@/app/api/utils/sql";
 
-// Execute arbitrage trade sequence: USDT → AEVO → BTC → USDT
-export async function POST(request) {
+// Execute arbitrage trade sequence: USDT → XRP → BTC → USDT
+async function postHandler(request) {
   const startTime = Date.now();
   let trade = null;
 
@@ -44,9 +45,9 @@ export async function POST(request) {
 
     if (
       !current_prices ||
-      !current_prices["AEVO/USDT"] ||
+      !current_prices["XRP/USDT"] ||
       !current_prices["BTC/USDT"] ||
-      !current_prices["AEVO/BTC"]
+      !current_prices["XRP/BTC"]
     ) {
       return Response.json(
         {
@@ -122,11 +123,11 @@ export async function POST(request) {
     }
 
     // Validate price sanity (prevent arbitrage on stale/invalid prices)
-    const aevoUsdtPrice = parseFloat(current_prices["AEVO/USDT"]);
+    const xrpUsdtPrice = parseFloat(current_prices["XRP/USDT"]);
     const btcUsdtPrice = parseFloat(current_prices["BTC/USDT"]);
-    const aevoBtcPrice = parseFloat(current_prices["AEVO/BTC"]);
+    const xrpBtcPrice = parseFloat(current_prices["XRP/BTC"]);
 
-    if (aevoUsdtPrice <= 0 || btcUsdtPrice <= 0 || aevoBtcPrice <= 0) {
+    if (xrpUsdtPrice <= 0 || btcUsdtPrice <= 0 || xrpBtcPrice <= 0) {
       return Response.json(
         {
           success: false,
@@ -137,11 +138,11 @@ export async function POST(request) {
     }
 
     // Price staleness check - reject if prices seem unrealistic
-    if (aevoUsdtPrice > 10 || aevoUsdtPrice < 0.01) {
+    if (xrpUsdtPrice > 10 || xrpUsdtPrice < 0.01) {
       return Response.json(
         {
           success: false,
-          error: "AEVO/USDT price appears stale or invalid",
+          error: "XRP/USDT price appears stale or invalid",
         },
         { status: 400 },
       );
@@ -158,8 +159,8 @@ export async function POST(request) {
     }
 
     // Calculate expected profit BEFORE starting trade
-    const expectedAevoAmount = trade_amount / aevoUsdtPrice;
-    const expectedBtcAmount = expectedAevoAmount * aevoBtcPrice;
+    const expectedXrpAmount = trade_amount / xrpUsdtPrice;
+    const expectedBtcAmount = expectedXrpAmount * xrpBtcPrice;
     const expectedFinalUsdt = expectedBtcAmount * btcUsdtPrice;
     const expectedProfit = expectedFinalUsdt - trade_amount;
     const expectedProfitPercentage = (expectedProfit / trade_amount) * 100;
@@ -167,7 +168,7 @@ export async function POST(request) {
     console.log("Expected trade outcome:", {
       expectedProfit: expectedProfit.toFixed(4),
       expectedProfitPercentage: expectedProfitPercentage.toFixed(4),
-      expectedAevoAmount: expectedAevoAmount.toFixed(8),
+      expectedXrpAmount: expectedXrpAmount.toFixed(8),
       expectedBtcAmount: expectedBtcAmount.toFixed(8),
     });
 
@@ -221,10 +222,10 @@ export async function POST(request) {
     try {
       const tradeResult = await sql`
         INSERT INTO trades (
-          user_id, trade_type, entry_price_aevo, entry_price_btc, 
+          user_id, trade_type, entry_price_xrp, entry_price_btc,
           trade_amount, is_demo, status
         ) VALUES (
-          ${user_id}, 'arbitrage', ${aevoUsdtPrice}, ${btcUsdtPrice},
+          ${user_id}, 'arbitrage', ${xrpUsdtPrice}, ${btcUsdtPrice},
           ${trade_amount}, ${is_demo}, 'executing'
         ) RETURNING *
       `;
@@ -244,12 +245,12 @@ export async function POST(request) {
 
     // Execute the three-step arbitrage with proper error handling
     let step1Data, step2Data, step3Data;
-    let aevoAmount, btcAmount;
+    let xrpAmount, btcAmount;
 
     try {
-      // Step 1: Buy AEVO with USDT
-      console.log("Step 1: Buying AEVO with USDT");
-      const aevoQuantity = trade_amount / aevoUsdtPrice;
+      // Step 1: Buy XRP with USDT
+      console.log("Step 1: Buying XRP with USDT");
+      const xrpQuantity = trade_amount / xrpUsdtPrice;
 
       const step1Response = await fetch(
         process.env.NODE_ENV === "development"
@@ -259,10 +260,10 @@ export async function POST(request) {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            symbol: "AEVOUSDT",
+            symbol: "XRPUSDT",
             side: "buy",
             type: "market",
-            quantity: aevoQuantity,
+            quantity: xrpQuantity,
             isDemoMode: is_demo,
             // Pass API credentials for live trading
             ...(apiCredentials && {
@@ -282,7 +283,7 @@ export async function POST(request) {
           errorText,
         );
         throw new Error(
-          `Step 1 failed: Buy AEVO - HTTP ${step1Response.status}`,
+          `Step 1 failed: Buy XRP - HTTP ${step1Response.status}`,
         );
       }
 
@@ -293,12 +294,21 @@ export async function POST(request) {
         throw new Error(`Step 1 failed: ${step1Data.error}`);
       }
 
-      aevoAmount = parseFloat(step1Data.data.executedQty);
-      if (aevoAmount <= 0) {
+      // --- Slippage Check for Step 1 ---
+      const executedPrice1 = parseFloat(step1Data.data.executedPrice);
+      const slippage1 = Math.abs(executedPrice1 - xrpUsdtPrice) / xrpUsdtPrice;
+      if (slippage1 > 0.01) { // 1% slippage tolerance
+        throw new Error(`Slippage on leg 1 (Buy XRP) exceeded 1%: ${slippage1.toFixed(4)}`);
+      }
+      console.log(`Slippage on leg 1: ${(slippage1 * 100).toFixed(4)}%`);
+
+
+      xrpAmount = parseFloat(step1Data.data.executedQty);
+      if (xrpAmount <= 0) {
         throw new Error("Step 1 failed: Invalid executed quantity");
       }
 
-      console.log("Acquired AEVO amount:", aevoAmount);
+      console.log("Acquired XRP amount:", xrpAmount);
 
       // Realistic inter-trade delay
       const delay1 = is_demo
@@ -307,8 +317,8 @@ export async function POST(request) {
       console.log(`Waiting ${Math.round(delay1)}ms between trades...`);
       await new Promise((resolve) => setTimeout(resolve, delay1));
 
-      // Step 2: Sell AEVO for BTC
-      console.log("Step 2: Selling AEVO for BTC");
+      // Step 2: Sell XRP for BTC
+      console.log("Step 2: Selling XRP for BTC");
       const step2Response = await fetch(
         process.env.NODE_ENV === "development"
           ? "http://localhost:3000/api/bitget/trade"
@@ -317,10 +327,10 @@ export async function POST(request) {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            symbol: "AEVOBTC",
+            symbol: "XRPBTC",
             side: "sell",
             type: "market",
-            quantity: aevoAmount,
+            quantity: xrpAmount,
             isDemoMode: is_demo,
             // Pass API credentials for live trading
             ...(apiCredentials && {
@@ -340,7 +350,7 @@ export async function POST(request) {
           errorText,
         );
         throw new Error(
-          `Step 2 failed: Sell AEVO for BTC - HTTP ${step2Response.status}`,
+          `Step 2 failed: Sell XRP for BTC - HTTP ${step2Response.status}`,
         );
       }
 
@@ -350,6 +360,14 @@ export async function POST(request) {
       if (!step2Data.success) {
         throw new Error(`Step 2 failed: ${step2Data.error}`);
       }
+
+      // --- Slippage Check for Step 2 ---
+      const executedPrice2 = parseFloat(step2Data.data.executedPrice);
+      const slippage2 = Math.abs(executedPrice2 - xrpBtcPrice) / xrpBtcPrice;
+      if (slippage2 > 0.01) { // 1% slippage tolerance
+        throw new Error(`Slippage on leg 2 (Sell XRP) exceeded 1%: ${slippage2.toFixed(4)}`);
+      }
+      console.log(`Slippage on leg 2: ${(slippage2 * 100).toFixed(4)}%`);
 
       btcAmount = parseFloat(step2Data.data.executedQty);
       if (btcAmount <= 0) {
@@ -409,6 +427,16 @@ export async function POST(request) {
         throw new Error(`Step 3 failed: ${step3Data.error}`);
       }
 
+      // --- Slippage Check for Step 3 ---
+      const executedPrice3 = parseFloat(step3Data.data.executedPrice);
+      const slippage3 = Math.abs(executedPrice3 - btcUsdtPrice) / btcUsdtPrice;
+      if (slippage3 > 0.01) { // 1% slippage tolerance
+        // This is the last step, so we don't need to abort, but we should log it as a warning.
+        console.warn(`Slippage on leg 3 (Sell BTC) exceeded 1%: ${slippage3.toFixed(4)}`);
+      } else {
+        console.log(`Slippage on leg 3: ${(slippage3 * 100).toFixed(4)}%`);
+      }
+
       const finalUsdtAmount = parseFloat(step3Data.data.executedQty);
       const finalUsdtPrice = parseFloat(step3Data.data.executedPrice);
 
@@ -438,7 +466,7 @@ export async function POST(request) {
       const updatedTrade = await sql`
         UPDATE trades SET 
           status = 'completed',
-          exit_price_aevo = ${step2Data.data.executedPrice},
+          exit_price_xrp = ${step2Data.data.executedPrice},
           exit_price_btc = ${finalUsdtPrice},
           profit_loss = ${profit},
           profit_percentage = ${profitPercentage},
@@ -452,13 +480,13 @@ export async function POST(request) {
       // Record the arbitrage opportunity with execution data
       await sql`
         INSERT INTO arbitrage_opportunities (
-          aevo_price, btc_price, aevo_ma, btc_ma,
-          aevo_deviation, btc_deviation, potential_profit, profit_percentage,
+          xrp_price, btc_price, xrp_ma, btc_ma,
+          xrp_deviation, btc_deviation, potential_profit, profit_percentage,
           was_executed, trade_id
         ) VALUES (
-          ${aevoUsdtPrice}, ${btcUsdtPrice},
-          ${settings?.aevoUsdtMA || 0}, ${settings?.aevoBtcMA || 0},
-          ${settings?.aevoUsdtDeviation || 0}, ${settings?.aevoBtcDeviation || 0},
+          ${xrpUsdtPrice}, ${btcUsdtPrice},
+          ${settings?.xrpUsdtMA || 0}, ${settings?.xrpBtcMA || 0},
+          ${settings?.xrpUsdtDeviation || 0}, ${settings?.xrpBtcDeviation || 0},
           ${profit}, ${profitPercentage}, true, ${trade.id}
         )
       `;
@@ -479,19 +507,19 @@ export async function POST(request) {
           steps: [
             {
               step: 1,
-              action: "Buy AEVO",
+              action: "Buy XRP",
               result: {
                 ...step1Data.data,
-                symbol: "AEVOUSDT",
-                executedAmount: aevoAmount,
+                symbol: "XRPUSDT",
+                executedAmount: xrpAmount,
               },
             },
             {
               step: 2,
-              action: "Sell AEVO for BTC",
+              action: "Sell XRP for BTC",
               result: {
                 ...step2Data.data,
-                symbol: "AEVOBTC",
+                symbol: "XRPBTC",
                 executedAmount: btcAmount,
               },
             },
@@ -507,11 +535,11 @@ export async function POST(request) {
             },
           ],
           strategy: {
-            route: "USDT → AEVO → BTC → USDT",
+            route: "USDT → XRP → BTC → USDT",
             entryAmount: trade_amount,
             exitAmount: finalUsdt,
-            aevoUsdtDeviation: settings?.aevoUsdtDeviation,
-            aevoBtcDeviation: settings?.aevoBtcDeviation,
+            xrpUsdtDeviation: settings?.xrpUsdtDeviation,
+            xrpBtcDeviation: settings?.xrpBtcDeviation,
           },
         },
       });
@@ -599,8 +627,11 @@ export async function POST(request) {
   }
 }
 
+export const POST = withStrictRateLimit(postHandler);
+export const GET = withStrictRateLimit(getHandler);
+
 // Get arbitrage execution status
-export async function GET(request) {
+async function getHandler(request) {
   try {
     const { searchParams } = new URL(request.url);
     const trade_id = searchParams.get("trade_id");
