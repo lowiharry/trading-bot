@@ -1,4 +1,4 @@
-import { withDataRateLimit } from "@/app/api/utils/rateLimiter";
+import { withDataRateLimit } from "../../utils/rateLimiter.js";
 
 // Bitget API integration for real-time price data
 async function handler(request) {

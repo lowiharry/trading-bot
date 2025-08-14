@@ -1,4 +1,4 @@
-import sql from "@/app/api/utils/sql";
+import sql from "../utils/sql.js";
 
 // Create a new trade record
 export async function POST(request) {

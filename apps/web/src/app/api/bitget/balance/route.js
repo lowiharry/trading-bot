@@ -21,7 +21,7 @@ export async function GET(request) {
     }
 
     // Get API credentials for live mode
-    const sql = (await import("@/app/api/utils/sql")).default;
+    const sql = (await import("../../utils/sql.js")).default;
     
     try {
       const settingsResult = await sql`
